@@ -13,7 +13,7 @@
 ## 執行指令
 
 ```bash
-# 單元與 API 測試（7 個檔案、55 項測試）
+# 單元與 API 測試（7 個檔案、58 項測試）
 npm run test:unit
 
 # 結帳、訂單、DB、庫存、回滾與綠界整合測試（10 項測試）
@@ -27,6 +27,8 @@ npm run postman
 ```
 
 Integration Test 不呼叫真實綠界 API，無需外部網路。
+
+模擬付款端點（`PATCH /api/orders/:id/pay`）需同時滿足 `NODE_ENV=test` 與 `ENABLE_MOCK_PAYMENT=true`。`tests/setup/testEnvironment.js` 已設定後者，新增測試時不需自行處理；若在測試中改動 `NODE_ENV`，記得還原。
 
 ## 驗收測試（Acceptance Test）
 
@@ -101,6 +103,7 @@ NODE_ENV=test
 DATABASE_PATH=:memory:
 JWT_SECRET=integration-test-secret
 ECPAY_ENV=staging
+ENABLE_MOCK_PAYMENT=true
 ```
 
 `src/database.js` 依 `DATABASE_PATH` 選擇 SQLite：
@@ -139,7 +142,7 @@ Integration Test 中有兩層防護：
 | `tests/auth.test.js` | 註冊、登入、重複 Email、個人資料、非字串欄位、JSON 格式錯誤 |
 | `tests/products.test.js` | 商品列表、分頁、詳情與 404 |
 | `tests/cart.test.js` | 訪客/會員購物車 CRUD、數量驗證、登入/註冊時合併訪客購物車（含庫存上限） |
-| `tests/orders.test.js` | 建單、配送費、查詢與認證、模擬付款僅限測試環境 |
+| `tests/orders.test.js` | 建單、配送費、查詢與認證、跨會員訂單詳情 404、模擬付款僅限測試環境 |
 | `tests/adminProducts.test.js` | 後台商品 CRUD 與權限、刪除仍在購物車中的商品、名稱驗證 |
 | `tests/adminOrders.test.js` | 後台訂單列表、詳情與篩選 |
 
@@ -205,4 +208,4 @@ stock        = 10 - 2 = 8
 
 - Supertest 會為 Express app 建立臨時本機監聽埠，但不會執行 `server.js` 的長時間 `app.listen()`。
 - Integration Test 之前端範圍為 EJS/靜態腳本 smoke test 與同等 HTTP 流程；真實瀏覽器 DOM、點擊及外部付款由 Playwright E2E 負責。
-- Vitest 會設定 `NODE_ENV=test`，種子管理員與註冊 API 的 bcrypt rounds 皆為 1；`PATCH /api/orders/:id/pay` 也只在此環境開放。
+- Vitest 會設定 `NODE_ENV=test` 與 `ENABLE_MOCK_PAYMENT=true`，種子管理員與註冊 API 的 bcrypt rounds 皆為 1；`PATCH /api/orders/:id/pay` 只在兩者同時成立時開放。

@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+- `.claude/agents/` 新增 `security-reviewer`、`code-reviewer`、`test-runner` 三個唯讀 subagent 定義
+- `docs/ai-review.md`：訂單、付款、運費、購物車的審查報告，含修正狀態與未修正項目
+
 ### Changed
 - 抽出 `src/services/orderService.js`（訂單查詢、序列化與建單 transaction）與 `src/services/paymentService.js`（QueryTradeInfo 結果判斷與付款狀態更新）
 - 新增 `src/utils/validators.js` 統一路由輸入驗證；Shipping 模組改以規則表描述，單元測試改為 table-driven
@@ -11,6 +15,17 @@
 - `scripts/generate-postman.js` 產生結果固定，同一份 OpenAPI 重跑不再出現亂數差異
 
 ### Fixed
+- 訂單詳情未檢查所有權，任何會員可讀取他人訂單的收件資料；改用 `findOrderForUser`，非本人一律 404
+- 購物車 `PATCH /api/cart/:itemId` 只擋 `NaN`，會接受 0、負數與小數；改用 `parsePositiveInteger`，非正整數回 400
+- 綠界 `QueryTradeInfo` 回應缺少 `CheckMacValue` 時會跳過簽章驗證；改為缺少即視為驗證失敗，訂單維持 pending
+- 滿額免運門檻不一致：伺服器用 `> 1500`，前端與文件用 `>= 1500`；統一為 `>=` 並恢復被 `it.skip` 的 1,500 邊界測試
+- 建單扣庫存改為 `WHERE id = ? AND stock >= ?` 條件式更新，`changes = 0` 即 rollback 並回 400，避免跨 process 超賣
+- 訂單單號 UNIQUE 碰撞時重試最多 5 次，不再直接回 500
+- `NODE_ENV=production` 啟動檢查：預設 `ADMIN_PASSWORD`、弱 `JWT_SECRET`、缺少綠界金鑰、`ENABLE_MOCK_PAYMENT=true` 一律拒絕啟動
+- 模擬付款端點改為需同時 `NODE_ENV=test` 與 `ENABLE_MOCK_PAYMENT=true`；`action` 改用 `hasOwnProperty`，阻擋 `constructor` 等原型鍵
+- 授權改以資料庫 `role` 為準，不再信任 JWT 內的 role，管理員降權後立即失效
+- 頁面渲染失敗只回通用訊息，不再將 `err.message` 回給瀏覽器
+- 訂單收件欄位補上長度上限（姓名 100、Email 254、地址 255）
 - 修正 macOS 上 Vitest 測試隨機失敗（401、200 或逾時）：supertest 自開的臨時伺服器綁在 `::`、卻連到 `127.0.0.1`，可能連到同埠的其他程式。新增 `tests/setup/testServer.js` 先在 `127.0.0.1` 開好伺服器，Unit、Integration 與驗收測試皆改用它
 
 ## [1.2.0] - 2026-10-06

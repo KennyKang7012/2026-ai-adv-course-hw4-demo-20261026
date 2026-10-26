@@ -156,18 +156,19 @@ CREATE TABLE IF NOT EXISTS your_table (
 
 | 變數 | 用途 | 必要性 | 預設值 |
 |------|------|--------|--------|
-| `JWT_SECRET` | JWT 簽章密鑰 | **必要**（缺少會崩潰） | 無 |
+| `JWT_SECRET` | JWT 簽章密鑰 | **必要**（缺少會崩潰） | 無（`NODE_ENV=production` 時須 ≥ 32 字元且非範例值，否則拒絕啟動） |
 | `DATABASE_PATH` | SQLite 路徑；測試可設 `:memory:` | 選填 | `<project>/database.sqlite` |
 | `PORT` | 伺服器監聽埠號 | 選填 | `3001` |
 | `BASE_URL` | 伺服器基礎 URL | 選填 | `http://localhost:3001` |
 | `FRONTEND_URL` | CORS 允許來源 | 選填 | `http://localhost:3001`（app.js fallback） |
 | `ADMIN_EMAIL` | 種子管理員信箱 | 選填 | `admin@hexschool.com` |
-| `ADMIN_PASSWORD` | 種子管理員密碼 | 選填 | `12345678` |
-| `NODE_ENV` | 執行環境 | 選填 | 無（`test` 時 bcrypt salt rounds 為 1、開放模擬付款端點；其他 → 10 rounds、模擬付款回 404） |
-| `ECPAY_MERCHANT_ID` | 綠界商店代號 | 選填 | `3002607` |
-| `ECPAY_HASH_KEY` | 綠界 CheckMacValue HashKey | 選填 | staging 官方測試值 |
-| `ECPAY_HASH_IV` | 綠界 CheckMacValue HashIV | 選填 | staging 官方測試值 |
-| `ECPAY_ENV` | 綠界環境（`staging` / `production`） | 選填 | `staging` |
+| `ADMIN_PASSWORD` | 種子管理員密碼 | 選填 | `12345678`（`NODE_ENV=production` 時必填且不得為此預設值） |
+| `NODE_ENV` | 執行環境 | 選填 | 無（`test` 時 bcrypt salt rounds 為 1；其他 → 10 rounds） |
+| `ENABLE_MOCK_PAYMENT` | 開放 `PATCH /api/orders/:id/pay` 模擬付款 | 選填 | 未設定（`true` 且 `NODE_ENV=test` 才生效；production 設為 `true` 會拒絕啟動） |
+| `ECPAY_MERCHANT_ID` | 綠界商店代號 | 選填 | `3002607`（`NODE_ENV=production` 時必填） |
+| `ECPAY_HASH_KEY` | 綠界 CheckMacValue HashKey | 選填 | staging 官方測試值（`NODE_ENV=production` 時必填） |
+| `ECPAY_HASH_IV` | 綠界 CheckMacValue HashIV | 選填 | staging 官方測試值（`NODE_ENV=production` 時必填） |
+| `ECPAY_ENV` | 綠界環境（`staging` / `production`） | 選填 | `staging`（`NODE_ENV=production` 時必須為 `production`） |
 | `E2E_BASE_URL` | Playwright 對已啟動服務之網址 | 選填 | `http://localhost:3001` |
 | `E2E_ADMIN_EMAIL` | E2E 登入帳號 | 選填 | `admin@hexschool.com` |
 | `E2E_ADMIN_PASSWORD` | E2E 登入密碼 | 選填 | `12345678` |
@@ -176,7 +177,7 @@ CREATE TABLE IF NOT EXISTS your_table (
 
 ## 測試隔離規範
 
-- 所有 Vitest 設定必須先載入 `tests/setup/testEnvironment.js`，再 import `app.js` 或 `src/database.js`。
+- 所有 Vitest 設定必須先載入 `tests/setup/testEnvironment.js`，再 import `app.js` 或 `src/database.js`。該檔已設定 `ENABLE_MOCK_PAYMENT=true`，模擬付款端點才可用。
 - API 測試一律從 `tests/setup.js`（或 `tests/setup/testServer.js`）取得 `app` 交給 supertest，不要直接 `require('../app')`：supertest 自開的臨時伺服器在 macOS 上可能連到同埠的其他程式，造成測試隨機失敗。
 - 自動測試必須使用 `DATABASE_PATH=:memory:` 或測試專屬臨時 SQLite，不得寫入專案 `database.sqlite`。
 - Integration Test 每項皆應自行建立 fixture，並依 foreign key 順序清理資料。

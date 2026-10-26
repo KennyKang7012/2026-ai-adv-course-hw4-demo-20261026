@@ -14,7 +14,7 @@
 | 後台訂單管理 | ✅ 完成 | 訂單查詢與狀態篩選 |
 | 前台頁面 | ✅ 完成 | EJS + Tailwind CSS |
 | 後台頁面 | ✅ 完成 | EJS + Tailwind CSS |
-| 測試 | ✅ 完成 | 55 項 Unit/API + 10 項 Integration + 1 項綠界真實付款 E2E |
+| 測試 | ✅ 完成 | 58 項 Unit/API + 10 項 Integration + 1 項綠界真實付款 E2E |
 | API 文件 | ✅ 完成 | Swagger/OpenAPI 生成與 Postman Collection 自動轉換 |
 
 ---
@@ -188,7 +188,7 @@
 
 | 欄位 | 型別 | 必填 | 說明 |
 |------|------|------|------|
-| quantity | integer | 是 | 新數量，必須為正整數 |
+| quantity | integer | 是 | 新數量，必須為正整數（0、負數、小數、`"3abc"`、布林值皆回 400） |
 
 **業務邏輯**：
 - 所有權檢查：品項必須屬於當前使用者/session
@@ -229,7 +229,7 @@
 |------|------|
 | 宅配 | 基本運費 120 元 |
 | 超商取貨 | 基本運費 60 元 |
-| 商品小計滿 1,500 元 | 基本運費 0 元 |
+| 商品小計達 1,500 元（含） | 基本運費 0 元 |
 | 偏遠地區 | 加收 200 元 |
 | 當日急件 | 加收 250 元 |
 
@@ -249,9 +249,9 @@
 
 | 欄位 | 型別 | 必填 | 驗證規則 |
 |------|------|------|----------|
-| recipientName | string | 是 | 非空字串 |
-| recipientEmail | string | 是 | 符合 email 正則 |
-| recipientAddress | string | 是 | 非空字串 |
+| recipientName | string | 是 | 非空字串，上限 100 字元 |
+| recipientEmail | string | 是 | 符合 email 正則，上限 254 字元 |
+| recipientAddress | string | 是 | 非空字串，上限 255 字元 |
 | shippingMethod | string | 是 | `home_delivery` 或 `convenience_store` |
 | isRemoteArea | boolean | 是 | 是否為偏遠地區 |
 | isExpress | boolean | 是 | 是否為當日急件 |
@@ -264,7 +264,7 @@
 5. 依資料庫價格計算 `subtotal = Σ(price × quantity)`
 6. 調用 Shipping 模組計算 `shippingFee`，並得 `totalAmount = subtotal + shippingFee`
 7. 生成 `orderNo = ORD-YYYYMMDD-{5碼UUID大寫}`（日期採台北時間）
-8. **Transaction**：INSERT order（含配送快照） → INSERT order_items（快照名稱+價格） → UPDATE stock → DELETE cart_items
+8. **Transaction**：INSERT order（含配送快照） → INSERT order_items（快照名稱+價格） → `UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?` → DELETE cart_items。庫存扣減帶條件，`changes = 0` 代表檢查後庫存已被其他交易用掉，整筆 rollback 並回 400 STOCK_INSUFFICIENT，避免跨 process 超賣
 9. 回傳 201 + 訂單詳情（含 `subtotal`、`shipping_fee`、`total_amount`）
 
 **錯誤情境**：
@@ -275,7 +275,7 @@
 | 400 | VALIDATION_ERROR | Email 格式不正確 |
 | 400 | VALIDATION_ERROR | 配送方式不支援，或偏遠/急件旗標非 boolean |
 | 400 | CART_EMPTY | 購物車為空 |
-| 400 | STOCK_INSUFFICIENT | 庫存不足（訊息中列出所有不足商品名稱） |
+| 400 | STOCK_INSUFFICIENT | 庫存不足（訊息中列出所有不足商品名稱；交易內條件式扣減失敗亦回此錯誤） |
 
 ### GET /api/orders — 訂單列表
 
@@ -300,7 +300,7 @@
 
 ### PATCH /api/orders/:id/pay — 模擬付款（僅測試環境）
 
-**行為描述**：模擬付款結果，更新訂單狀態。不涉及真實金流，**只在 `NODE_ENV=test` 時開放**，供自動測試使用；其他環境一律回 404，避免會員把自己的訂單直接改成已付款。正式付款流程請使用綠界金流。
+**行為描述**：模擬付款結果，更新訂單狀態。不涉及真實金流，**只在 `NODE_ENV=test` 且 `ENABLE_MOCK_PAYMENT=true` 時開放**，供自動測試使用；其他環境一律回 404，避免會員把自己的訂單直接改成已付款。正式付款流程請使用綠界金流。
 
 **Request Body**：
 
@@ -319,7 +319,7 @@
 |--------|--------|------|
 | 400 | VALIDATION_ERROR | action 不是 success 或 fail |
 | 400 | INVALID_STATUS | 訂單狀態不是 pending |
-| 404 | NOT_FOUND | 訂單不存在或非本人所有，或非測試環境 |
+| 404 | NOT_FOUND | 訂單不存在或非本人所有，或非測試環境／未開啟 `ENABLE_MOCK_PAYMENT` |
 
 ---
 
@@ -377,7 +377,7 @@
 2. 訂單已非 pending → 直接回傳現有狀態
 3. 訂單無 `merchant_trade_no` → 400
 4. 呼叫綠界 `POST /Cashier/QueryTradeInfo/V5`（TimeStamp 每次重新產生，有效期 3 分鐘）
-5. `TradeStatus === '1'` 時，先驗證回應的 CheckMacValue，並核對 `MerchantTradeNo`、`TradeAmt` 與訂單一致；任一不符 → 500 `ECPAY_QUERY_ERROR`，訂單維持 pending
+5. `TradeStatus === '1'` 時，**必須**有 CheckMacValue 且驗證通過，並核對 `MerchantTradeNo`、`TradeAmt` 與訂單一致；缺少簽章或任一不符 → 500 `ECPAY_QUERY_ERROR`，訂單維持 pending
 6. 驗證通過 → 以 `WHERE status = 'pending'` 條件更新為 `paid`（狀態不可逆），回傳成功
 7. 其他 TradeStatus → 回傳「尚未完成付款」，不改變訂單狀態
 

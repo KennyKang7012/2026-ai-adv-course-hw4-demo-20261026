@@ -95,7 +95,7 @@
 └── tests/
     ├── setup.js                    # API 測試輔助：getAdminToken()、registerUser()
     ├── setup/
-    │   ├── testEnvironment.js       # 強制 NODE_ENV=test 與記憶體 SQLite
+    │   ├── testEnvironment.js       # 強制 NODE_ENV=test、記憶體 SQLite 與 ENABLE_MOCK_PAYMENT=true
     │   ├── testServer.js            # supertest 用的測試伺服器（綁 127.0.0.1）
     │   └── integrationGlobalSetup.mjs # 原 database.sqlite 雜湊守衛
     ├── integration/
@@ -182,7 +182,7 @@ server.js
 | POST | `/api/orders` | JWT | 從購物車建立訂單（伺服器重算運費與總額） | orderRoutes.js |
 | GET | `/api/orders` | JWT | 自己的訂單列表 | orderRoutes.js |
 | GET | `/api/orders/:id` | JWT | 訂單詳情 | orderRoutes.js |
-| PATCH | `/api/orders/:id/pay` | JWT | 模擬付款（僅 `NODE_ENV=test`，其他環境 404） | orderRoutes.js |
+| PATCH | `/api/orders/:id/pay` | JWT | 模擬付款（需 `NODE_ENV=test` 且 `ENABLE_MOCK_PAYMENT=true`，其他環境 404） | orderRoutes.js |
 | POST | `/api/orders/:id/check-payment` | JWT | 查詢綠界付款狀態 | orderRoutes.js |
 
 ### 後台商品（/api/admin/products）
@@ -271,10 +271,12 @@ server.js
 | `NOT_FOUND` | 404 | 資源不存在（商品、訂單、購物車項目、使用者） |
 | `CONFLICT` | 409 | 資源衝突（Email 已註冊、商品有未完成訂單無法刪除） |
 | `INTERNAL_ERROR` | 500 | 伺服器內部錯誤（一律回「伺服器內部錯誤」，不洩露細節） |
-| `ECPAY_QUERY_ERROR` | 500 | 綠界查詢失敗，或回應的簽章、交易編號、金額驗證不符 |
+| `ECPAY_QUERY_ERROR` | 500 | 綠界查詢失敗，或回應缺少簽章、簽章／交易編號／金額驗證不符 |
 | `NO_TRADE_NO` | 400 | 訂單沒有綠界交易編號 |
 
 路由未自行處理、由 `errorHandler` 接手的錯誤（例如 JSON 格式錯誤），依狀態碼對應錯誤碼：400 → `VALIDATION_ERROR`、401 → `UNAUTHORIZED`、403 → `FORBIDDEN`、404 → `NOT_FOUND`、409 → `CONFLICT`、5xx → `INTERNAL_ERROR`。
+
+頁面路由（EJS）渲染失敗時只回固定訊息「頁面載入失敗」，實際錯誤寫入伺服器日誌，不將 `err.message` 回給瀏覽器。
 
 ## 認證與授權機制
 
@@ -283,12 +285,12 @@ server.js
 - **位置**：`src/middleware/authMiddleware.js`
 - **演算法**：HS256
 - **有效期**：7 天（`expiresIn: '7d'`）
-- **Token Payload**：`{ userId, email, role }`
+- **Token Payload**：`{ userId, email, role }`（role 僅供前端顯示，授權判斷一律以資料庫為準）
 - **驗證流程**：
   1. 檢查 `Authorization` header 是否存在且以 `Bearer ` 開頭
   2. 提取 token，呼叫 `jwt.verify()` 驗證簽章與過期時間
   3. 查詢資料庫確認 `userId` 對應的使用者仍然存在
-  4. 設定 `req.user = { userId, email, role }`
+  4. 以資料庫的 `id`、`email`、`role` 設定 `req.user`；不採用 token 內的 role，管理員降權後立即失效
 - **失敗回應**：401，訊息依情境為「請先登入」/「Token 無效或已過期」/「使用者不存在，請重新登入」
 
 ### 管理員授權（adminMiddleware）
@@ -408,7 +410,8 @@ server.js
      ├─ INSERT orders 記錄
      ├─ 對每個購物車品項：
      │   ├─ INSERT order_items（快照 product_name, product_price）
-     │   └─ UPDATE products SET stock = stock - quantity
+     │   └─ UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?
+     │        （changes = 0 → rollback → 400 STOCK_INSUFFICIENT）
      └─ DELETE cart_items WHERE user_id = ?
      🔒 Transaction 結束
 │
@@ -417,7 +420,7 @@ server.js
 
 ## Shipping 模組
 
-`src/utils/shipping.js` 不依賴 Express 或資料庫，專責根據 `subtotal`、配送方式、偏遠地區與當日急件條件，計算基本運費、附加費、最終運費與訂單總額。滿 1,500 元僅免基本運費，附加費仍依條件累加。建立訂單路由不接受前端自行計算的金額。
+`src/utils/shipping.js` 不依賴 Express 或資料庫，專責根據 `subtotal`、配送方式、偏遠地區與當日急件條件，計算基本運費、附加費、最終運費與訂單總額。小計達 1,500 元（含）僅免基本運費，附加費仍依條件累加。建立訂單路由不接受前端自行計算的金額。
 
 ## 綠界金流付款流程
 
@@ -440,9 +443,9 @@ server.js
        └─ POST /api/orders/:id/check-payment
             ├─ 呼叫綠界 QueryTradeInfo API（TimeStamp 每次重新產生）
             ├─ TradeStatus === '1'
-            │    ├─ 驗證 CheckMacValue，並核對 MerchantTradeNo 與 TradeAmt
+            │    ├─ 必須有 CheckMacValue 且驗證通過，並核對 MerchantTradeNo 與 TradeAmt
             │    ├─ 通過 → 更新訂單狀態為 paid（僅限仍為 pending 的訂單）
-            │    └─ 不符 → 500 ECPAY_QUERY_ERROR，訂單維持 pending
+            │    └─ 缺少簽章或任一不符 → 500 ECPAY_QUERY_ERROR，訂單維持 pending
             └─ 其他 → 回傳「尚未完成付款」
 ```
 
@@ -464,9 +467,11 @@ server.js
 | `ECPAY_HASH_IV` | 雜湊向量 | EkRm7iFT261dpevs |
 | `ECPAY_ENV` | 環境（staging / production） | staging |
 
+上表為 staging 測試值。`NODE_ENV=production` 時三把金鑰必須由環境變數提供，且 `ECPAY_ENV` 必須為 `production`，否則伺服器在載入時直接拋錯，不會安靜地使用公開測試金鑰。
+
 ### 付款模擬端點（僅測試環境）
 
-模擬付款端點只在 `NODE_ENV=test` 時開放，供自動測試使用；其他環境回 404：
+模擬付款端點需同時滿足 `NODE_ENV=test` 與 `ENABLE_MOCK_PAYMENT=true` 才開放；其他環境回 404。production 即使誤設 `ENABLE_MOCK_PAYMENT=true`，伺服器也會拒絕啟動：
 
 ```
 PATCH /api/orders/:id/pay
