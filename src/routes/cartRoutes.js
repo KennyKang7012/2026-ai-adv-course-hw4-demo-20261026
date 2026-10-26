@@ -293,9 +293,9 @@ router.patch('/:itemId', dualAuth, (req, res) => {
   const { itemId } = req.params;
   const { quantity } = req.body;
 
-  const qty = Number(quantity);
-  if (Number.isNaN(qty)) {
-    return res.status(400).json({ data: null, error: 'VALIDATION_ERROR', message: 'quantity 必須為數字' });
+  const qty = parsePositiveInteger(quantity);
+  if (qty === null) {
+    return res.status(400).json({ data: null, error: 'VALIDATION_ERROR', message: 'quantity 必須為正整數' });
   }
 
   const owner = getOwnerCondition(req);

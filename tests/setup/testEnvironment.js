@@ -7,3 +7,5 @@ process.env.ECPAY_MERCHANT_ID = '3002607';
 process.env.ECPAY_HASH_KEY = 'pwFHCqoQZGmho4w6';
 process.env.ECPAY_HASH_IV = 'EkRm7iFT261dpevs';
 process.env.ECPAY_ENV = 'staging';
+// Mock payment stays behind an explicit opt-in, same as production code
+process.env.ENABLE_MOCK_PAYMENT = 'true';

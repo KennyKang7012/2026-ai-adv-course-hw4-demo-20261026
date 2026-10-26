@@ -1,5 +1,17 @@
 const crypto = require('crypto');
 
+// In production the fallbacks below would silently use ECPay's public staging credentials.
+if (process.env.NODE_ENV === 'production') {
+  const required = ['ECPAY_MERCHANT_ID', 'ECPAY_HASH_KEY', 'ECPAY_HASH_IV'];
+  const missing = required.filter(key => !process.env[key]);
+  if (missing.length > 0) {
+    throw new Error(`Fatal: missing ECPay configuration in production: ${missing.join(', ')}`);
+  }
+  if (process.env.ECPAY_ENV !== 'production') {
+    throw new Error('Fatal: ECPAY_ENV must be "production" when NODE_ENV=production');
+  }
+}
+
 const ECPAY_CONFIG = {
   merchantId: process.env.ECPAY_MERCHANT_ID || '3002607',
   hashKey: process.env.ECPAY_HASH_KEY || 'pwFHCqoQZGmho4w6',

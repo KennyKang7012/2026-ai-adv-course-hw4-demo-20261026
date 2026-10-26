@@ -59,15 +59,31 @@ function findInsufficientItems(cartItems) {
   return cartItems.filter(item => item.quantity > item.product_stock);
 }
 
+const MAX_ORDER_NO_ATTEMPTS = 5;
+
+class StockInsufficientError extends Error {
+  constructor(productName) {
+    super(`庫存不足：${productName}`);
+    this.name = 'StockInsufficientError';
+    this.code = 'STOCK_INSUFFICIENT';
+    this.productName = productName;
+  }
+}
+
+function isOrderNoCollision(err) {
+  return err.code === 'SQLITE_CONSTRAINT_UNIQUE' && String(err.message).includes('order_no');
+}
+
 /**
  * Create an order from the member's cart in one transaction:
  * insert order → snapshot items → deduct stock → clear cart.
  * Amounts must already be calculated by the caller.
+ *
+ * Stock is deducted with a `stock >= ?` guard inside the transaction, so two
+ * processes cannot both pass the earlier pre-check and oversell.
  */
 function createOrderFromCart({ userId, recipient, delivery, cartItems, subtotal, shipping }) {
   const orderId = uuidv4();
-  const orderNo = generateOrderNo();
-  const merchantTradeNo = orderNo.replace(/-/g, '');
 
   const insertOrder = db.prepare(
     `INSERT INTO orders (
@@ -80,10 +96,12 @@ function createOrderFromCart({ userId, recipient, delivery, cartItems, subtotal,
     `INSERT INTO order_items (id, order_id, product_id, product_name, product_price, quantity)
      VALUES (?, ?, ?, ?, ?, ?)`
   );
-  const updateStock = db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?');
+  const updateStock = db.prepare(
+    'UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?'
+  );
   const clearCart = db.prepare('DELETE FROM cart_items WHERE user_id = ?');
 
-  db.transaction(() => {
+  const createWithOrderNo = db.transaction((orderNo) => {
     insertOrder.run(
       orderId,
       orderNo,
@@ -97,22 +115,35 @@ function createOrderFromCart({ userId, recipient, delivery, cartItems, subtotal,
       delivery.isRemoteArea ? 1 : 0,
       delivery.isExpress ? 1 : 0,
       shipping.totalAmount,
-      merchantTradeNo
+      orderNo.replace(/-/g, '')
     );
 
     for (const item of cartItems) {
       insertItem.run(uuidv4(), orderId, item.product_id, item.product_name, item.product_price, item.quantity);
-      updateStock.run(item.quantity, item.product_id);
+      const result = updateStock.run(item.quantity, item.product_id, item.quantity);
+      if (result.changes === 0) {
+        throw new StockInsufficientError(item.product_name);
+      }
     }
 
     clearCart.run(userId);
-  })();
+  });
 
-  return orderId;
+  // order_no is UNIQUE; retry with a fresh number on a collision instead of failing the request
+  for (let attempt = 0; attempt < MAX_ORDER_NO_ATTEMPTS; attempt++) {
+    try {
+      createWithOrderNo(generateOrderNo());
+      return orderId;
+    } catch (err) {
+      const isLastAttempt = attempt === MAX_ORDER_NO_ATTEMPTS - 1;
+      if (!isOrderNoCollision(err) || isLastAttempt) throw err;
+    }
+  }
 }
 
 module.exports = {
   generateOrderNo,
+  StockInsufficientError,
   serializeOrder,
   findOrderById,
   findOrderForUser,

@@ -12,8 +12,8 @@ function isTradePaid(order, tradeInfo, config = ECPAY_CONFIG) {
     return false;
   }
 
-  if (tradeInfo.CheckMacValue && !verifyCheckMacValue(tradeInfo, config.hashKey, config.hashIV)) {
-    throw new Error('QueryTradeInfo CheckMacValue mismatch');
+  if (!tradeInfo.CheckMacValue || !verifyCheckMacValue(tradeInfo, config.hashKey, config.hashIV)) {
+    throw new Error('QueryTradeInfo CheckMacValue missing or mismatched');
   }
 
   if (tradeInfo.MerchantTradeNo !== order.merchant_trade_no) {
@@ -35,8 +35,17 @@ function markOrderPaid(orderId) {
   return result.changes > 0;
 }
 
+// Mock payment failure path; same guard so a paid order never goes backwards
+function markOrderFailed(orderId) {
+  const result = db.prepare(
+    "UPDATE orders SET status = 'failed' WHERE id = ? AND status = 'pending'"
+  ).run(orderId);
+  return result.changes > 0;
+}
+
 module.exports = {
   TRADE_STATUS_PAID,
   isTradePaid,
-  markOrderPaid
+  markOrderPaid,
+  markOrderFailed
 };

@@ -426,6 +426,8 @@ describe('Order checkout integration flow', () => {
     const forgedResponses = [
       // Tampered signature
       `MerchantID=${ECPAY_CONFIG.merchantId}&MerchantTradeNo=${merchantTradeNo}&TradeAmt=${order.total_amount}&TradeStatus=1&CheckMacValue=${'0'.repeat(64)}`,
+      // Paid status with no signature at all; must not be treated as fail-open
+      `MerchantID=${ECPAY_CONFIG.merchantId}&MerchantTradeNo=${merchantTradeNo}&TradeAmt=${order.total_amount}&TradeStatus=1`,
       // Valid signature but a different amount
       signedTradeInfo({
         MerchantID: ECPAY_CONFIG.merchantId,

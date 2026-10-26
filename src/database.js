@@ -108,13 +108,26 @@ function initializeDatabase() {
   db.prepare('UPDATE orders SET subtotal = total_amount WHERE subtotal = 0').run();
 
   // Seed data
+  assertAdminCredentials();
   seedAdminUser();
   seedProducts();
 }
 
+const DEFAULT_ADMIN_PASSWORD = '12345678';
+
+// A production deployment must not boot with the documented default password
+function assertAdminCredentials() {
+  if (process.env.NODE_ENV !== 'production') return;
+
+  const password = process.env.ADMIN_PASSWORD;
+  if (!password || password === DEFAULT_ADMIN_PASSWORD) {
+    throw new Error('Fatal: ADMIN_PASSWORD must be set to a non-default value in production');
+  }
+}
+
 function seedAdminUser() {
   const adminEmail = process.env.ADMIN_EMAIL || 'admin@hexschool.com';
-  const adminPassword = process.env.ADMIN_PASSWORD || '12345678';
+  const adminPassword = process.env.ADMIN_PASSWORD || DEFAULT_ADMIN_PASSWORD;
 
   const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(adminEmail);
   if (!existing) {

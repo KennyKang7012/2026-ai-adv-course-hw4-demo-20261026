@@ -6,7 +6,10 @@ const router = express.Router();
 // Helper to render with front layout
 function renderFront(res, page, locals = {}) {
   res.render('pages/' + page, { layout: 'front', ...locals }, function (err, body) {
-    if (err) return res.status(500).send(err.message);
+    if (err) {
+      console.error('[Page render] front:', err.message);
+      return res.status(500).send('頁面載入失敗');
+    }
     res.render('layouts/front', { body, ...locals });
   });
 }
@@ -14,7 +17,10 @@ function renderFront(res, page, locals = {}) {
 // Helper to render with admin layout
 function renderAdmin(res, page, locals = {}) {
   res.render('pages/admin/' + page, locals, function (err, body) {
-    if (err) return res.status(500).send(err.message);
+    if (err) {
+      console.error('[Page render] admin:', err.message);
+      return res.status(500).send('頁面載入失敗');
+    }
     res.render('layouts/admin', { body, ...locals });
   });
 }

@@ -1,5 +1,4 @@
 const express = require('express');
-const db = require('../database');
 const authMiddleware = require('../middleware/authMiddleware');
 const { queryTradeInfo } = require('../utils/ecpay');
 const { SHIPPING_METHODS, calculateShipping } = require('../utils/shipping');
@@ -14,16 +13,19 @@ const {
   findInsufficientItems,
   createOrderFromCart
 } = require('../services/orderService');
-const { isTradePaid, markOrderPaid } = require('../services/paymentService');
+const { isTradePaid, markOrderPaid, markOrderFailed } = require('../services/paymentService');
 const { isNonEmptyString } = require('../utils/validators');
 
 const router = express.Router();
 
+const RECIPIENT_LIMITS = Object.freeze({ name: 100, email: 254, address: 255 });
+
 router.use(authMiddleware);
 
-// Mock payment is test-only; otherwise any member could mark their own order as paid
+// Mock payment is test-only; otherwise any member could mark their own order as paid.
+// Requires an explicit opt-in as well, so a stray NODE_ENV=test is not enough.
 function testEnvOnly(req, res, next) {
-  if (process.env.NODE_ENV !== 'test') {
+  if (process.env.NODE_ENV !== 'test' || process.env.ENABLE_MOCK_PAYMENT !== 'true') {
     return res.status(404).json({ data: null, error: 'NOT_FOUND', message: '找不到該資源' });
   }
   next();
@@ -121,11 +123,15 @@ router.post('/', (req, res) => {
   } = req.body;
   const userId = req.user.userId;
 
-  if (!isNonEmptyString(recipientName) || !isNonEmptyString(recipientEmail) || !isNonEmptyString(recipientAddress)) {
+  if (
+    !isNonEmptyString(recipientName) || recipientName.length > RECIPIENT_LIMITS.name ||
+    !isNonEmptyString(recipientEmail) || recipientEmail.length > RECIPIENT_LIMITS.email ||
+    !isNonEmptyString(recipientAddress) || recipientAddress.length > RECIPIENT_LIMITS.address
+  ) {
     return res.status(400).json({
       data: null,
       error: 'VALIDATION_ERROR',
-      message: '收件人姓名、Email 和地址為必填欄位'
+      message: `收件人姓名、Email 和地址為必填欄位，長度上限為 ${RECIPIENT_LIMITS.name}/${RECIPIENT_LIMITS.email}/${RECIPIENT_LIMITS.address}`
     });
   }
 
@@ -185,14 +191,26 @@ router.post('/', (req, res) => {
     isExpress
   });
 
-  const orderId = createOrderFromCart({
-    userId,
-    recipient: { name: recipientName, email: recipientEmail, address: recipientAddress },
-    delivery: { method: shippingMethod, isRemoteArea, isExpress },
-    cartItems,
-    subtotal,
-    shipping
-  });
+  let orderId;
+  try {
+    orderId = createOrderFromCart({
+      userId,
+      recipient: { name: recipientName, email: recipientEmail, address: recipientAddress },
+      delivery: { method: shippingMethod, isRemoteArea, isExpress },
+      cartItems,
+      subtotal,
+      shipping
+    });
+  } catch (err) {
+    if (err.code === 'STOCK_INSUFFICIENT') {
+      return res.status(400).json({
+        data: null,
+        error: 'STOCK_INSUFFICIENT',
+        message: `以下商品庫存不足：${err.productName}`
+      });
+    }
+    throw err;
+  }
 
   const order = findOrderById(orderId);
   const orderItems = getOrderItemSummaries(orderId);
@@ -348,7 +366,7 @@ router.get('/', (req, res) => {
  *         description: 訂單不存在
  */
 router.get('/:id', (req, res) => {
-  const order = findOrderById(req.params.id);
+  const order = findOrderForUser(req.params.id, req.user.userId);
 
   if (!order) {
     return res.status(404).json({ data: null, error: 'NOT_FOUND', message: '訂單不存在' });
@@ -435,7 +453,7 @@ router.patch('/:id/pay', testEnvOnly, (req, res) => {
   const userId = req.user.userId;
 
   const actionMap = { success: 'paid', fail: 'failed' };
-  if (!action || !actionMap[action]) {
+  if (typeof action !== 'string' || !Object.prototype.hasOwnProperty.call(actionMap, action)) {
     return res.status(400).json({
       data: null,
       error: 'VALIDATION_ERROR',
@@ -456,8 +474,15 @@ router.patch('/:id/pay', testEnvOnly, (req, res) => {
     });
   }
 
-  const newStatus = actionMap[action];
-  db.prepare("UPDATE orders SET status = ? WHERE id = ? AND status = 'pending'").run(newStatus, order.id);
+  // Route through the shared status transitions so the state machine stays in one place
+  const changed = action === 'success' ? markOrderPaid(order.id) : markOrderFailed(order.id);
+  if (!changed) {
+    return res.status(400).json({
+      data: null,
+      error: 'INVALID_STATUS',
+      message: '訂單狀態已變更，無法付款'
+    });
+  }
 
   const updated = findOrderById(order.id);
   const items = getOrderItems(order.id);
