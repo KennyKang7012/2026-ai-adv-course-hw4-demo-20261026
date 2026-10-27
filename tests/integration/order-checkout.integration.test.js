@@ -273,6 +273,123 @@ describe('Order checkout integration flow', () => {
     expect(cartItem.quantity).toBe(3);
   });
 
+  it('applies a coupon to the item subtotal and records it on the order', async () => {
+    const member = await registerMember('coupon@example.com');
+    const couponProduct = createProduct({ name: '優惠碼測試花束', price: 800, stock: 5 });
+    await addProductToCart(member.token, couponProduct.id, 1);
+
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${member.token}`)
+      .send({
+        ...ORDER_PAYLOAD,
+        shippingMethod: 'home_delivery',
+        isRemoteArea: false,
+        isExpress: false,
+        couponCode: 'flower100'
+      });
+
+    expectEnvelope(response, 201);
+    expect(response.body.data).toMatchObject({
+      subtotal: 800,
+      discount: 100,
+      coupon_code: 'FLOWER100',
+      shipping_fee: 120,
+      total_amount: 820
+    });
+
+    const stored = db.prepare(
+      'SELECT coupon_code, discount, total_amount FROM orders WHERE id = ?'
+    ).get(response.body.data.id);
+    expect(stored).toMatchObject({
+      coupon_code: 'FLOWER100',
+      discount: 100,
+      total_amount: 820
+    });
+
+    const listResponse = await request(app)
+      .get('/api/orders')
+      .set('Authorization', `Bearer ${member.token}`);
+    expectEnvelope(listResponse, 200);
+    expect(listResponse.body.data.orders[0]).toMatchObject({
+      coupon_code: 'FLOWER100',
+      discount: 100
+    });
+  });
+
+  it('rejects an invalid coupon without creating an order or changing stock or cart', async () => {
+    const member = await registerMember('invalid-coupon@example.com');
+    await addProductToCart(member.token, primaryProduct.id, 2);
+
+    const response = await request(app)
+      .post('/api/orders')
+      .set('Authorization', `Bearer ${member.token}`)
+      .send({ ...ORDER_PAYLOAD, couponCode: 'SUMMER50' });
+
+    expectEnvelope(response, 400);
+    expect(response.body.data).toBeNull();
+    expect(response.body.error).toBe('INVALID_COUPON');
+    expect(db.prepare('SELECT COUNT(*) AS count FROM orders').get().count).toBe(0);
+    expect(db.prepare('SELECT stock FROM products WHERE id = ?').get(primaryProduct.id).stock).toBe(10);
+
+    const cartItem = db.prepare(
+      'SELECT quantity FROM cart_items WHERE user_id = ? AND product_id = ?'
+    ).get(member.user.id, primaryProduct.id);
+    expect(cartItem.quantity).toBe(2);
+  });
+
+  it.each([
+    { subtotal: 1550, expectedShipping: 120 },
+    { subtotal: 1600, expectedShipping: 0 }
+  ])(
+    'judges free shipping by the discounted subtotal: $subtotal → $expectedShipping',
+    async ({ subtotal, expectedShipping }) => {
+      const member = await registerMember(`coupon-threshold-${subtotal}@example.com`);
+      const product = createProduct({ name: `免運門檻測試 ${subtotal}`, price: subtotal, stock: 5 });
+      await addProductToCart(member.token, product.id, 1);
+
+      const response = await request(app)
+        .post('/api/orders')
+        .set('Authorization', `Bearer ${member.token}`)
+        .send({
+          ...ORDER_PAYLOAD,
+          shippingMethod: 'home_delivery',
+          isRemoteArea: false,
+          isExpress: false,
+          couponCode: 'FLOWER100'
+        });
+
+      expectEnvelope(response, 201);
+      expect(response.body.data).toMatchObject({
+        subtotal,
+        discount: 100,
+        coupon_code: 'FLOWER100',
+        shipping_fee: expectedShipping,
+        total_amount: subtotal - 100 + expectedShipping
+      });
+    }
+  );
+
+  it('rejects non-string coupon codes without side effects', async () => {
+    for (const [index, couponCode] of [123, {}, true].entries()) {
+      const member = await registerMember(`non-string-coupon-${index}@example.com`);
+      const product = createProduct({ name: `非字串優惠碼 ${index}`, price: 800, stock: 5 });
+      await addProductToCart(member.token, product.id, 1);
+
+      const response = await request(app)
+        .post('/api/orders')
+        .set('Authorization', `Bearer ${member.token}`)
+        .send({ ...ORDER_PAYLOAD, couponCode });
+
+      expectEnvelope(response, 400);
+      expect(response.body.data).toBeNull();
+      expect(response.body.error).toBe('INVALID_COUPON');
+      expect(
+        db.prepare('SELECT COUNT(*) AS count FROM orders WHERE user_id = ?').get(member.user.id).count
+      ).toBe(0);
+    }
+  });
+
   it('rolls back the entire transaction when an order item insert fails midway', async () => {
     const secondProduct = createProduct({
       name: '回滾測試花束',

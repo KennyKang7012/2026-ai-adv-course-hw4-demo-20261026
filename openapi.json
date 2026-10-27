@@ -245,6 +245,10 @@
                   },
                   "isExpress": {
                     "type": "boolean"
+                  },
+                  "couponCode": {
+                    "type": "string",
+                    "description": "選填優惠碼，不分大小寫"
                   }
                 }
               }
@@ -270,6 +274,13 @@
                         },
                         "subtotal": {
                           "type": "integer"
+                        },
+                        "discount": {
+                          "type": "integer"
+                        },
+                        "coupon_code": {
+                          "type": "string",
+                          "nullable": true
                         },
                         "shipping_fee": {
                           "type": "integer"
@@ -328,7 +339,7 @@
             }
           },
           "400": {
-            "description": "購物車為空或庫存不足或收件資訊缺失"
+            "description": "購物車為空、庫存不足、收件資訊缺失，或優惠碼無效／已失效／未達門檻"
           }
         }
       },
@@ -366,6 +377,13 @@
                               },
                               "subtotal": {
                                 "type": "integer"
+                              },
+                              "discount": {
+                                "type": "integer"
+                              },
+                              "coupon_code": {
+                                "type": "string",
+                                "nullable": true
                               },
                               "shipping_fee": {
                                 "type": "integer"
@@ -451,6 +469,13 @@
                         },
                         "subtotal": {
                           "type": "integer"
+                        },
+                        "discount": {
+                          "type": "integer"
+                        },
+                        "coupon_code": {
+                          "type": "string",
+                          "nullable": true
                         },
                         "shipping_fee": {
                           "type": "integer"
