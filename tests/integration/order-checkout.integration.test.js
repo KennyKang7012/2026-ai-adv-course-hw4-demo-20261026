@@ -306,6 +306,15 @@ describe('Order checkout integration flow', () => {
       discount: 100,
       total_amount: 820
     });
+
+    const listResponse = await request(app)
+      .get('/api/orders')
+      .set('Authorization', `Bearer ${member.token}`);
+    expectEnvelope(listResponse, 200);
+    expect(listResponse.body.data.orders[0]).toMatchObject({
+      coupon_code: 'FLOWER100',
+      discount: 100
+    });
   });
 
   it('rejects an invalid coupon without creating an order or changing stock or cart', async () => {

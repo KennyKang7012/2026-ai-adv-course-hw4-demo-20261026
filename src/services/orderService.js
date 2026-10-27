@@ -28,7 +28,7 @@ function findOrderForUser(orderId, userId) {
 
 function listOrdersForUser(userId) {
   return db.prepare(
-    `SELECT id, order_no, subtotal, shipping_fee, shipping_method,
+    `SELECT id, order_no, subtotal, discount, coupon_code, shipping_fee, shipping_method,
             is_remote_area, is_express, total_amount, status, created_at
      FROM orders WHERE user_id = ? ORDER BY created_at DESC`
   ).all(userId);

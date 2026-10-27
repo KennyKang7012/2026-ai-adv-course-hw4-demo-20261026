@@ -131,4 +131,4 @@
 ## 9. 實作結果與落差
 
 - 測試結果：unit 71 passed、integration 12 passed、acceptance（coupon）10 passed。
-- 已知落差：`listOrdersForUser()` 的 SELECT 未包含 `coupon_code`／`discount`，但 OpenAPI 列表 schema 已補上這兩個欄位。需修正其一，待 review 後處理。
+- 已修正落差：`listOrdersForUser()` 原本未選 `coupon_code`／`discount`，與 OpenAPI 列表 schema 不一致；已補上欄位，並在整合測試斷言列表回應。
