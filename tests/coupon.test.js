@@ -41,6 +41,7 @@ describe('Coupon module', () => {
     it.each([
       [1000, 100],
       [1234, 123],
+      [1235, 124],
       [3500, 300]
     ])('SPRING10：小計 %i 元折 %i 元（四捨五入、上限 300）', (subtotal, discount) => {
       expect(calculateDiscount('SPRING10', subtotal).discount).toBe(discount);

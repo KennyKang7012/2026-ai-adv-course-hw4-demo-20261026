@@ -119,7 +119,7 @@ function testEnvOnly(req, res, next) {
  *                 message:
  *                   type: string
  *       400:
- *         description: 購物車為空或庫存不足或收件資訊缺失
+ *         description: 購物車為空、庫存不足、收件資訊缺失，或優惠碼無效／已失效／未達門檻
  */
 router.post('/', (req, res) => {
   const {

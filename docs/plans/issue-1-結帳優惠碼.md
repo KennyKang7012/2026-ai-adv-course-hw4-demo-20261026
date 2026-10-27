@@ -130,5 +130,6 @@
 
 ## 9. 實作結果與落差
 
-- 測試結果：unit 71 passed、integration 12 passed、acceptance（coupon）10 passed。
+- 測試結果：unit 72 passed、integration 15 passed、acceptance（coupon）10 passed。
 - 已修正落差：`listOrdersForUser()` 原本未選 `coupon_code`／`discount`，與 OpenAPI 列表 schema 不一致；已補上欄位，並在整合測試斷言列表回應。
+- Review 後補強：整合測試新增「折扣後小計決定免運」的 1,550／1,600 兩案與非字串優惠碼案例；單元測試補 1,235 元的四捨五入邊界；JSDoc 與 OpenAPI 補上 `INVALID_COUPON`。

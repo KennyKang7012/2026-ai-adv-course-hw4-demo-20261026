@@ -13,10 +13,10 @@
 ## 執行指令
 
 ```bash
-# 單元與 API 測試（8 個檔案、71 項測試）
+# 單元與 API 測試（8 個檔案、72 項測試）
 npm run test:unit
 
-# 結帳、訂單、DB、庫存、回滾與綠界整合測試（12 項測試）
+# 結帳、訂單、DB、庫存、回滾與綠界整合測試（15 項測試）
 npm run test:integration
 
 # 已另行啟動 http://localhost:3001 後，執行真實付款 E2E
