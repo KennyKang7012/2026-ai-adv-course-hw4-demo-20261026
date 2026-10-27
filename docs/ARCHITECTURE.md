@@ -180,7 +180,7 @@ server.js
 
 | 方法 | 路徑 | 認證 | 說明 | 檔案 |
 |------|------|------|------|------|
-| POST | `/api/orders` | JWT | 從購物車建立訂單（伺服器重算運費與總額） | orderRoutes.js |
+| POST | `/api/orders` | JWT | 從購物車建立訂單（伺服器重算折扣、運費與總額） | orderRoutes.js |
 | GET | `/api/orders` | JWT | 自己的訂單列表 | orderRoutes.js |
 | GET | `/api/orders/:id` | JWT | 訂單詳情 | orderRoutes.js |
 | PATCH | `/api/orders/:id/pay` | JWT | 模擬付款（需 `NODE_ENV=test` 且 `ENABLE_MOCK_PAYMENT=true`，其他環境 404） | orderRoutes.js |
@@ -266,6 +266,7 @@ server.js
 | `VALIDATION_ERROR` | 400 | 缺少必填欄位、格式不正確、數值超出範圍 |
 | `STOCK_INSUFFICIENT` | 400 | 庫存不足 |
 | `CART_EMPTY` | 400 | 購物車為空，無法建立訂單 |
+| `INVALID_COUPON` | 400 | 優惠碼不存在、已失效或未達門檻 |
 | `INVALID_STATUS` | 400 | 訂單狀態不允許此操作（如非 pending 訂單嘗試付款） |
 | `UNAUTHORIZED` | 401 | 未登入、Token 無效或已過期、使用者不存在 |
 | `FORBIDDEN` | 403 | 權限不足（非管理員存取後台路由） |

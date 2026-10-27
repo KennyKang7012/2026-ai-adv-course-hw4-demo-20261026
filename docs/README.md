@@ -1,6 +1,6 @@
 # 花卉電商網站（backend-project）
 
-花卉電商全端應用，提供前台商品瀏覽、購物車、配送費用計算、訂單管理，以及後台商品與訂單管理功能。支援訪客購物車（X-Session-Id）與會員登入（JWT）雙模式。
+花卉電商全端應用，提供前台商品瀏覽、購物車、配送費用計算、結帳優惠碼、訂單管理，以及後台商品與訂單管理功能。支援訪客購物車（X-Session-Id）與會員登入（JWT）雙模式。
 
 ## 技術棧
 
@@ -104,7 +104,7 @@ Vitest 與 Integration Test 皆使用記憶體 SQLite，不會修改專案根目
 
 ## 持續整合（CI）
 
-`.github/workflows/test.yml` 於每次 push、pull request 及手動觸發時，執行 `npm ci`、`npm run test:unit` 與 `npm run test:integration`。E2E 需要已啟動的服務與綠界 staging，驗收測試在 Issue 完成前預期失敗，兩者都不在 CI 執行。
+`.github/workflows/test.yml` 於每次 push、pull request 及手動觸發時，執行 `npm ci`、`npm run test:unit` 與 `npm run test:integration`。E2E 需要已啟動的服務與綠界 staging，未完成的 Issue 驗收測試預期失敗，兩者都不在 CI 執行。
 
 若儲存庫的 **Actions** 分頁顯示 workflow 未啟用，請先手動啟用。
 
@@ -117,5 +117,6 @@ Vitest 與 Integration Test 皆使用記憶體 SQLite，不會修改專案根目
 | [FEATURES.md](./FEATURES.md) | 功能列表與完成狀態（含行為描述） |
 | [TESTING.md](./TESTING.md) | 測試規範與指南 |
 | [CHANGELOG.md](./CHANGELOG.md) | 更新日誌 |
+| [ai-review.md](./ai-review.md) | 訂單／付款／運費／購物車審查報告與修正狀態 |
 | [plans/](./plans/) | 開發計畫目錄 |
 | [plans/archive/](./plans/archive/) | 已完成計畫歸檔 |

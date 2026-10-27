@@ -314,7 +314,7 @@
 
 **行為描述**：回傳當前使用者的所有訂單，依建立時間降序排列。無分頁。
 
-**回應欄位**：id, order_no, subtotal, shipping_fee, shipping_method, is_remote_area, is_express, total_amount, status, created_at
+**回應欄位**：id, order_no, subtotal, discount, coupon_code, shipping_fee, shipping_method, is_remote_area, is_express, total_amount, status, created_at
 
 ### GET /api/orders/:id — 訂單詳情
 

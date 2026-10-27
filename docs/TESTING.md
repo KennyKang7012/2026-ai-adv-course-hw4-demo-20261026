@@ -47,7 +47,7 @@ npm run test:acceptance -- coupon       # 只跑檔名包含 coupon 的測試
 
 - 設定檔為 `vitest.acceptance.config.js`，同樣使用記憶體 SQLite。
 - 只透過 HTTP API 驗證，不依賴內部函式名稱或資料表結構；每個測試自建會員與指定價格的商品。
-- 在 Issue 完成前預期失敗，因此不包含在 `test:unit`、`test:integration` 與 CI 中。
+- 在 Issue 完成前預期失敗，因此不包含在 `test:unit`、`test:integration` 與 CI 中。目前 Issue A（優惠碼）已完成，對應測試 10 項全綠；Issue B、C 尚未實作。
 
 ## 持續整合（CI）
 
@@ -162,6 +162,9 @@ Integration Test 中有兩層防護：
 | 金額 | 小計 1,400、運費 510、總額 1,910 |
 | 庫存/購物車 | 庫存 10 → 8，建單後購物車清空 |
 | 庫存不足 | 400 / `STOCK_INSUFFICIENT`，無訂單、無扣庫存、購物車保留 |
+| 優惠碼折扣 | `FLOWER100` 小計 800 → 折 100、運費 120、總額 820；訂單與列表皆回傳 `coupon_code`、`discount` |
+| 折扣後免運門檻 | 小計 1,550 折後 1,450 收運費；1,600 折後剛好 1,500 免基本運費 |
+| 無效優惠碼 | 400 / `INVALID_COUPON`，無訂單、無扣庫存、購物車保留；非字串同樣回 400 |
 | transaction 回滾 | 臨時 SQLite trigger 使第二筆品項寫入失敗，驗證訂單/品項/庫存/購物車全數回滾 |
 | ECPay AIO 表單 | staging action、MerchantTradeNo、TotalAmount、ItemName、URL 與 CheckMacValue |
 | QueryTradeInfo | mock 已付（附有效 CheckMacValue）、未付、HTTP 錯誤；驗證 API 與 DB 狀態 |
