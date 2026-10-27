@@ -82,15 +82,15 @@ function isOrderNoCollision(err) {
  * Stock is deducted with a `stock >= ?` guard inside the transaction, so two
  * processes cannot both pass the earlier pre-check and oversell.
  */
-function createOrderFromCart({ userId, recipient, delivery, cartItems, subtotal, shipping }) {
+function createOrderFromCart({ userId, recipient, delivery, cartItems, subtotal, discount = 0, couponCode = null, shipping }) {
   const orderId = uuidv4();
 
   const insertOrder = db.prepare(
     `INSERT INTO orders (
        id, order_no, user_id, recipient_name, recipient_email, recipient_address,
        subtotal, shipping_fee, shipping_method, is_remote_area, is_express,
-       total_amount, merchant_trade_no
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       total_amount, coupon_code, discount, merchant_trade_no
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
   const insertItem = db.prepare(
     `INSERT INTO order_items (id, order_id, product_id, product_name, product_price, quantity)
@@ -115,6 +115,8 @@ function createOrderFromCart({ userId, recipient, delivery, cartItems, subtotal,
       delivery.isRemoteArea ? 1 : 0,
       delivery.isExpress ? 1 : 0,
       shipping.totalAmount,
+      couponCode,
+      discount,
       orderNo.replace(/-/g, '')
     );
 

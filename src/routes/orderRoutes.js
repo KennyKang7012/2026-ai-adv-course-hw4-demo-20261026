@@ -15,6 +15,7 @@ const {
 } = require('../services/orderService');
 const { isTradePaid, markOrderPaid, markOrderFailed } = require('../services/paymentService');
 const { isNonEmptyString } = require('../utils/validators');
+const { calculateDiscount } = require('../utils/coupon');
 
 const router = express.Router();
 
@@ -61,6 +62,9 @@ function testEnvOnly(req, res, next) {
  *                 type: boolean
  *               isExpress:
  *                 type: boolean
+ *               couponCode:
+ *                 type: string
+ *                 description: 選填優惠碼，不分大小寫
  *     responses:
  *       201:
  *         description: 訂單建立成功
@@ -78,6 +82,11 @@ function testEnvOnly(req, res, next) {
  *                       type: string
  *                     subtotal:
  *                       type: integer
+ *                     discount:
+ *                       type: integer
+ *                     coupon_code:
+ *                       type: string
+ *                       nullable: true
  *                     shipping_fee:
  *                       type: integer
  *                     shipping_method:
@@ -119,7 +128,8 @@ router.post('/', (req, res) => {
     recipientAddress,
     shippingMethod,
     isRemoteArea,
-    isExpress
+    isExpress,
+    couponCode
   } = req.body;
   const userId = req.user.userId;
 
@@ -180,12 +190,29 @@ router.post('/', (req, res) => {
     });
   }
 
-  // Calculate the subtotal and server-authoritative shipping fee.
+  // Calculate the subtotal, then resolve the coupon before shipping:
+  // the free-shipping threshold applies to the discounted subtotal.
   const subtotal = cartItems.reduce(
     (sum, item) => sum + item.product_price * item.quantity, 0
   );
+
+  let coupon;
+  try {
+    coupon = calculateDiscount(couponCode, subtotal);
+  } catch (err) {
+    if (err.code === 'INVALID_COUPON') {
+      return res.status(400).json({
+        data: null,
+        error: 'INVALID_COUPON',
+        message: err.message
+      });
+    }
+    throw err;
+  }
+
+  const discountedSubtotal = subtotal - coupon.discount;
   const shipping = calculateShipping({
-    subtotal,
+    subtotal: discountedSubtotal,
     method: shippingMethod,
     isRemoteArea,
     isExpress
@@ -199,6 +226,8 @@ router.post('/', (req, res) => {
       delivery: { method: shippingMethod, isRemoteArea, isExpress },
       cartItems,
       subtotal,
+      discount: coupon.discount,
+      couponCode: coupon.couponCode,
       shipping
     });
   } catch (err) {
@@ -220,6 +249,8 @@ router.post('/', (req, res) => {
       id: order.id,
       order_no: order.order_no,
       subtotal: order.subtotal,
+      discount: order.discount,
+      coupon_code: order.coupon_code,
       shipping_fee: order.shipping_fee,
       shipping_method: order.shipping_method,
       is_remote_area: Boolean(order.is_remote_area),
@@ -264,6 +295,11 @@ router.post('/', (req, res) => {
  *                             type: string
  *                           subtotal:
  *                             type: integer
+ *                           discount:
+ *                             type: integer
+ *                           coupon_code:
+ *                             type: string
+ *                             nullable: true
  *                           shipping_fee:
  *                             type: integer
  *                           shipping_method:
@@ -327,6 +363,11 @@ router.get('/', (req, res) => {
  *                       type: string
  *                     subtotal:
  *                       type: integer
+ *                     discount:
+ *                       type: integer
+ *                     coupon_code:
+ *                       type: string
+ *                       nullable: true
  *                     shipping_fee:
  *                       type: integer
  *                     shipping_method:

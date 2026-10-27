@@ -5,6 +5,7 @@
 ## [Unreleased]
 
 ### Added
+- 結帳優惠碼（Issue #1）：新增 `src/utils/coupon.js`，支援 `FLOWER100`（滿 800 折 100）、`SPRING10`（9 折、上限 300）、`SUMMER50`（已失效）；`POST /api/orders` 接受選填 `couponCode`，訂單記錄 `coupon_code` 與 `discount`，免運門檻以折扣後小計判斷
 - `.claude/agents/` 新增 `security-reviewer`、`code-reviewer`、`test-runner` 三個唯讀 subagent 定義
 - `docs/ai-review.md`：訂單、付款、運費、購物車的審查報告，含修正狀態與未修正項目
 
