@@ -47,7 +47,7 @@ npm run test:acceptance -- coupon       # 只跑檔名包含 coupon 的測試
 
 - 設定檔為 `vitest.acceptance.config.js`，同樣使用記憶體 SQLite。
 - 只透過 HTTP API 驗證，不依賴內部函式名稱或資料表結構；每個測試自建會員與指定價格的商品。
-- 在 Issue 完成前預期失敗，因此不包含在 `test:unit`、`test:integration` 與 CI 中。目前 Issue A（優惠碼）已完成，對應測試 10 項全綠；Issue B、C 尚未實作。
+- 在 Issue 完成前預期失敗，因此不包含在 `test:unit`、`test:integration` 與 CI 中。目前 Issue A（優惠碼）10 項、Issue C（訂單篩選與分頁）7 項已完成並全綠；Issue B（取消訂單）尚未實作。
 
 ## 持續整合（CI）
 

@@ -15,7 +15,7 @@
 
 ## 修正狀態（2026-10-27）
 
-本輪修正 15 項。修正後 `npm run test:unit` 為 58 passed / 0 skipped，`npm run test:integration` 為 10 passed。後續 Issue #1（優惠碼）合併後，兩者分別為 72 與 15。
+本輪修正 15 項。修正後 `npm run test:unit` 為 58 passed / 0 skipped，`npm run test:integration` 為 10 passed。後續 Issue #1（優惠碼）與 Issue #3（訂單篩選與分頁）合併後，兩者分別為 72 與 18。
 
 > 下方各問題標示的行號是修正前 `9af6f29` 的位置，修正後已位移。
 
@@ -230,7 +230,7 @@ if (!action || !actionMap[action]) { ... }
 
 **說明**：README 記載 starter 的 main 上驗收測試預期失敗，所以這可能是刻意狀態。但若此 repo 是交付版本，等於三個 Issue 未完成且無計畫文件。
 
-> 2026-10-28 更新：優惠碼已由 PR #2 完成並合併，計畫文件見 `docs/plans/archive/issue-1-結帳優惠碼.md`；取消訂單與列表分頁仍未實作。
+> 2026-10-28 更新：優惠碼已由 PR #2 完成並合併，計畫文件見 `docs/plans/archive/issue-1-結帳優惠碼.md`；列表篩選與分頁已由 PR #4、PR #5 完成並合併，計畫見 `docs/plans/archive/issue-3-我的訂單篩選與分頁.md`；取消訂單仍未實作。
 
 **待確認**：交付範圍。
 
