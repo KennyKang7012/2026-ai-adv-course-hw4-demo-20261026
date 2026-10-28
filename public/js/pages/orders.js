@@ -5,6 +5,7 @@ createApp({
     if (!Auth.requireAuth()) return {};
 
     const orders = ref([]);
+    const pagination = ref(null);
     const loading = ref(true);
 
     const statusMap = {
@@ -17,13 +18,15 @@ createApp({
       try {
         const res = await apiFetch('/api/orders');
         orders.value = res.data.orders;
+        pagination.value = res.data.pagination || null;
       } catch (e) {
         orders.value = [];
+        pagination.value = null;
       } finally {
         loading.value = false;
       }
     });
 
-    return { orders, loading, statusMap, formatDate };
+    return { orders, pagination, loading, statusMap, formatDate };
   }
 }).mount('#app');

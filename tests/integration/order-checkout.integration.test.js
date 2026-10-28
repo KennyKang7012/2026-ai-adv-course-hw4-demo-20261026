@@ -417,6 +417,10 @@ describe('Order checkout integration flow', () => {
     expect(firstPage.body.data.orders).toHaveLength(10);
     expect(firstPage.body.data.pagination).toEqual({ page: 1, limit: 10, total: 12, totalPages: 2 });
 
+    // Newest first: page 1 is the last 10 created, page 3 holds the 2 oldest.
+    const expectedNewestFirst = [...orderIds].reverse();
+    expect(firstPage.body.data.orders.map(order => order.id)).toEqual(expectedNewestFirst.slice(0, 10));
+
     const timestamps = firstPage.body.data.orders.map(order => order.created_at);
     expect([...timestamps].sort().reverse()).toEqual(timestamps);
 
@@ -426,6 +430,7 @@ describe('Order checkout integration flow', () => {
     expectEnvelope(thirdPage, 200);
     expect(thirdPage.body.data.orders).toHaveLength(2);
     expect(thirdPage.body.data.pagination).toEqual({ page: 3, limit: 5, total: 12, totalPages: 3 });
+    expect(thirdPage.body.data.orders.map(order => order.id)).toEqual(expectedNewestFirst.slice(10, 12));
 
     const capped = await request(app)
       .get('/api/orders?limit=100')
@@ -452,9 +457,13 @@ describe('Order checkout integration flow', () => {
     for (const query of [
       '?status=unknown',
       '?status=',
+      '?status=paid&status=pending',
       '?page=0',
       '?page=abc',
       '?page=1.5',
+      '?page=1&page=2',
+      '?page=1000000000000000000',
+      '?limit=0',
       '?limit=-1',
       '?limit=abc'
     ]) {
