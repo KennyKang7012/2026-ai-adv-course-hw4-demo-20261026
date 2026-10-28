@@ -8,6 +8,8 @@
 - 訂單列表篩選與分頁（Issue #3）：`GET /api/orders` 支援 `status`、`page`、`limit`，回應加入 `pagination`；非法參數回 400，`limit` 上限 50
 - 結帳優惠碼（Issue #1）：新增 `src/utils/coupon.js`，支援 `FLOWER100`（滿 800 折 100）、`SPRING10`（9 折、上限 300）、`SUMMER50`（已失效）；`POST /api/orders` 接受選填 `couponCode`，訂單記錄 `coupon_code` 與 `discount`，免運門檻以折扣後小計判斷
 - `.claude/agents/` 新增 `security-reviewer`、`code-reviewer`、`test-runner` 三個唯讀 subagent 定義
+- `.claude/skills/work-issue/`：Issue 處理流程技能（驗證標籤與作者、開分支、先寫計畫、實作與測試、開 PR、審查、改 in-review）
+- `.claude/loop.md`：Issue Loop 的每輪判斷順序、邊界與回報格式
 - `docs/ai-review.md`：訂單、付款、運費、購物車的審查報告，含修正狀態與未修正項目
 
 ### Changed
