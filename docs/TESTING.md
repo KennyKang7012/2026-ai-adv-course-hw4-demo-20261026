@@ -16,7 +16,7 @@
 # 單元與 API 測試（8 個檔案、72 項測試）
 npm run test:unit
 
-# 結帳、訂單、DB、庫存、回滾與綠界整合測試（15 項測試）
+# 結帳、訂單、DB、庫存、回滾與綠界整合測試（18 項測試）
 npm run test:integration
 
 # 已另行啟動 http://localhost:3001 後，執行真實付款 E2E
@@ -165,6 +165,9 @@ Integration Test 中有兩層防護：
 | 優惠碼折扣 | `FLOWER100` 小計 800 → 折 100、運費 120、總額 820；訂單與列表皆回傳 `coupon_code`、`discount` |
 | 折扣後免運門檻 | 小計 1,550 折後 1,450 收運費；1,600 折後剛好 1,500 免基本運費 |
 | 無效優惠碼 | 400 / `INVALID_COUPON`，無訂單、無扣庫存、購物車保留；非字串同樣回 400 |
+| 訂單分頁與篩選 | 12 筆：預設第 1 頁 10 筆、`page=3&limit=5` 回 2 筆、`limit=100` 以 50 計、`status=paid` 只回已付款 |
+| 列表參數驗證 | `status=unknown`、`page=0`、`page=abc`、`limit=-1` 等皆回 400 `VALIDATION_ERROR` |
+| 列表隔離 | 只回傳當前會員的訂單，`pagination.total` 不含他人訂單 |
 | transaction 回滾 | 臨時 SQLite trigger 使第二筆品項寫入失敗，驗證訂單/品項/庫存/購物車全數回滾 |
 | ECPay AIO 表單 | staging action、MerchantTradeNo、TotalAmount、ItemName、URL 與 CheckMacValue |
 | QueryTradeInfo | mock 已付（附有效 CheckMacValue）、未付、HTTP 錯誤；驗證 API 與 DB 狀態 |
