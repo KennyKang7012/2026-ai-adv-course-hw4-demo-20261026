@@ -2,7 +2,7 @@
 
 - Issue：`#3 我的訂單篩選與分頁`
 - 分支：`issue-3-我的訂單篩選與分頁`
-- 狀態：計畫中（實作前撰寫）
+- 狀態：已完成（PR #4 合併 `128b6a6`；頁碼上限與前端提示由 follow-up PR 補強）
 - 撰寫時間：2026-10-29
 
 ## 1. 目標
@@ -28,13 +28,13 @@
 
 ## 3. 驗收條件
 
-- [ ] 不帶參數時回傳第 1 頁、每頁 10 筆，依建立時間由新到舊
-- [ ] `status=paid` 只回傳已付款訂單
-- [ ] 12 筆訂單、`limit=5` 時，第 3 頁有 2 筆，`totalPages` 為 3
-- [ ] `limit=100` 時以 50 計
-- [ ] `status=unknown`、`page=0`、`limit=-1` 回傳 400
-- [ ] 不會回傳其他會員的訂單
-- [ ] 不同時間建立的訂單，較新的排在前面
+- [x] 不帶參數時回傳第 1 頁、每頁 10 筆，依建立時間由新到舊
+- [x] `status=paid` 只回傳已付款訂單
+- [x] 12 筆訂單、`limit=5` 時，第 3 頁有 2 筆，`totalPages` 為 3
+- [x] `limit=100` 時以 50 計
+- [x] `status=unknown`、`page=0`、`limit=-1` 回傳 400
+- [x] 不會回傳其他會員的訂單
+- [x] 不同時間建立的訂單，較新的排在前面
 
 自動驗收：`tests/acceptance/order-filter.test.js`（不得修改）。
 
@@ -120,4 +120,13 @@ data: { orders: [...], pagination: { page, limit, total, totalPages } }
 
 ## 9. 實作結果與落差
 
-（實作完成後補填）
+- 三套測試：`test:unit` 72 passed、`test:integration` 18 passed、`test:acceptance -- order-filter` 7 passed。
+- 與計畫的差異：
+  - 排序加上 `rowid DESC` 作為同秒次要排序（計畫已列為設計）。
+  - `?status=`（空字串）視為非法，回 400；計畫未明列，實作採嚴格解讀。
+  - `page` 超過總頁數回空陣列，維持 200。
+- Review 結果（PR #4）：無 Critical／High。兩項 Medium 已於 follow-up 處理：
+  - `page` 超大（18 位數）導致 SQLite `datatype mismatch` 回 500 → 改為 `Number.isSafeInteger` 驗證與 offset 上限，實測四種輸入皆回 400。
+  - 前端超過 10 筆時靜默截斷 → 訂單頁顯示「僅顯示最近 N 筆，共 M 筆」提示。
+  - 另補：排序測試改為比對 id 順序（原本同秒情境是空斷言）、非法參數涵蓋重複參數與 `limit=0`。
+- 未實作：前端篩選與分頁 UI（Issue 列為選做）。

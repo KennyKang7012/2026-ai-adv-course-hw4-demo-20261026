@@ -17,6 +17,10 @@
 - `scripts/generate-postman.js` 產生結果固定，同一份 OpenAPI 重跑不再出現亂數差異
 
 ### Fixed
+- `GET /api/orders` 的 `page` 超出安全整數範圍時，SQLite 綁定 LIMIT/OFFSET 失敗會回 500；改為驗證並回 400 `VALIDATION_ERROR`
+- 訂單頁超過 10 筆時只顯示第一頁卻沒有任何提示；改為顯示「僅顯示最近 N 筆，共 M 筆」
+- 訂單列表排序測試在同時建立的訂單下是空斷言；改為比對回傳 id 與建立順序
+- 訂單列表非法參數測試補上重複參數、`limit=0` 與超大 `page`
 - 訂單詳情未檢查所有權，任何會員可讀取他人訂單的收件資料；改用 `findOrderForUser`，非本人一律 404
 - 購物車 `PATCH /api/cart/:itemId` 只擋 `NaN`，會接受 0、負數與小數；改用 `parsePositiveInteger`，非正整數回 400
 - 綠界 `QueryTradeInfo` 回應缺少 `CheckMacValue` 時會跳過簽章驗證；改為缺少即視為驗證失敗，訂單維持 pending

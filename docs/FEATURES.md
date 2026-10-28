@@ -329,6 +329,7 @@
 - 排序：`created_at DESC`，同秒時以 `rowid DESC` 為次序
 - `totalPages = ceil(total / limit)`；`total` 為 0 時 `totalPages` 為 0
 - `page` 超過總頁數時回空陣列，不視為錯誤
+- 前端訂單頁只顯示第一頁（預設 10 筆）；超過時顯示「僅顯示最近 N 筆，共 M 筆」提示，篩選與分頁 UI 尚未實作
 
 **錯誤情境**：
 

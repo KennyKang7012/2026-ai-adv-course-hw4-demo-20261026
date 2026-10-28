@@ -36,5 +36,12 @@
         </div>
       </div>
     </a>
+
+    <p
+      v-if="pagination && pagination.total > orders.length"
+      class="text-center text-xs text-text-muted pt-2"
+    >
+      僅顯示最近 {{ orders.length }} 筆，共 {{ pagination.total }} 筆
+    </p>
   </div>
 </div>

@@ -378,12 +378,23 @@ router.get('/', (req, res) => {
     });
   }
   const limit = Math.min(parsedLimit, ORDER_PAGE_DEFAULTS.maxLimit);
+  const offset = (page - 1) * limit;
+
+  // SQLite binds LIMIT/OFFSET as doubles and rejects values it cannot map back
+  // to an int64, which would surface as a 500 instead of a validation error.
+  if (!Number.isSafeInteger(offset)) {
+    return res.status(400).json({
+      data: null,
+      error: 'VALIDATION_ERROR',
+      message: 'page 過大'
+    });
+  }
 
   const { orders, total } = listOrdersForUser({
     userId: req.user.userId,
     status: statusFilter,
     limit,
-    offset: (page - 1) * limit
+    offset
   });
 
   res.json({
