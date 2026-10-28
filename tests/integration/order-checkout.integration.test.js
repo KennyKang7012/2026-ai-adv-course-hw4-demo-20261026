@@ -390,6 +390,111 @@ describe('Order checkout integration flow', () => {
     }
   });
 
+  it('paginates and filters a member\'s orders', async () => {
+    const member = await registerMember('order-pagination@example.com');
+    const product = createProduct({ name: '分頁測試花束', price: 100, stock: 50 });
+
+    const orderIds = [];
+    for (let i = 0; i < 12; i++) {
+      await addProductToCart(member.token, product.id, 1);
+      const created = await request(app)
+        .post('/api/orders')
+        .set('Authorization', `Bearer ${member.token}`)
+        .send({
+          ...ORDER_PAYLOAD,
+          shippingMethod: 'home_delivery',
+          isRemoteArea: false,
+          isExpress: false
+        });
+      expectEnvelope(created, 201);
+      orderIds.push(created.body.data.id);
+    }
+
+    const firstPage = await request(app)
+      .get('/api/orders')
+      .set('Authorization', `Bearer ${member.token}`);
+    expectEnvelope(firstPage, 200);
+    expect(firstPage.body.data.orders).toHaveLength(10);
+    expect(firstPage.body.data.pagination).toEqual({ page: 1, limit: 10, total: 12, totalPages: 2 });
+
+    const timestamps = firstPage.body.data.orders.map(order => order.created_at);
+    expect([...timestamps].sort().reverse()).toEqual(timestamps);
+
+    const thirdPage = await request(app)
+      .get('/api/orders?page=3&limit=5')
+      .set('Authorization', `Bearer ${member.token}`);
+    expectEnvelope(thirdPage, 200);
+    expect(thirdPage.body.data.orders).toHaveLength(2);
+    expect(thirdPage.body.data.pagination).toEqual({ page: 3, limit: 5, total: 12, totalPages: 3 });
+
+    const capped = await request(app)
+      .get('/api/orders?limit=100')
+      .set('Authorization', `Bearer ${member.token}`);
+    expectEnvelope(capped, 200);
+    expect(capped.body.data.pagination.limit).toBe(50);
+
+    await request(app)
+      .patch(`/api/orders/${orderIds[0]}/pay`)
+      .set('Authorization', `Bearer ${member.token}`)
+      .send({ action: 'success' });
+
+    const paid = await request(app)
+      .get('/api/orders?status=paid')
+      .set('Authorization', `Bearer ${member.token}`);
+    expectEnvelope(paid, 200);
+    expect(paid.body.data.orders.map(order => order.id)).toEqual([orderIds[0]]);
+    expect(paid.body.data.pagination.total).toBe(1);
+  });
+
+  it('rejects invalid order list query parameters', async () => {
+    const member = await registerMember('order-filter-invalid@example.com');
+
+    for (const query of [
+      '?status=unknown',
+      '?status=',
+      '?page=0',
+      '?page=abc',
+      '?page=1.5',
+      '?limit=-1',
+      '?limit=abc'
+    ]) {
+      const response = await request(app)
+        .get(`/api/orders${query}`)
+        .set('Authorization', `Bearer ${member.token}`);
+
+      expectEnvelope(response, 400);
+      expect(response.body.data).toBeNull();
+      expect(response.body.error).toBe('VALIDATION_ERROR');
+    }
+  });
+
+  it('lists only the requesting member\'s orders', async () => {
+    const mine = await registerMember('orders-mine@example.com');
+    const other = await registerMember('orders-other@example.com');
+    const product = createProduct({ name: '隔離測試花束', price: 100, stock: 50 });
+
+    async function placeOrders(member, count) {
+      for (let i = 0; i < count; i++) {
+        await addProductToCart(member.token, product.id, 1);
+        const created = await request(app)
+          .post('/api/orders')
+          .set('Authorization', `Bearer ${member.token}`)
+          .send({ ...ORDER_PAYLOAD });
+        expectEnvelope(created, 201);
+      }
+    }
+
+    await placeOrders(mine, 2);
+    await placeOrders(other, 3);
+
+    const response = await request(app)
+      .get('/api/orders')
+      .set('Authorization', `Bearer ${mine.token}`);
+    expectEnvelope(response, 200);
+    expect(response.body.data.orders).toHaveLength(2);
+    expect(response.body.data.pagination.total).toBe(2);
+  });
+
   it('rolls back the entire transaction when an order item insert fails midway', async () => {
     const secondProduct = createProduct({
       name: '回滾測試花束',

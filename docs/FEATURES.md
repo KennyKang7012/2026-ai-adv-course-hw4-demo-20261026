@@ -9,13 +9,13 @@
 | 購物車管理 | ✅ 完成 | 雙模式認證（JWT / Session ID），登入時合併訪客購物車 |
 | 配送費用 | ✅ 完成 | 宅配/超商、滿額免基本運費、偏遠/急件附加費 |
 | 結帳優惠碼 | ✅ 後端完成 | FLOWER100、SPRING10、SUMMER50；前端結帳頁尚未提供輸入欄位 |
-| 訂單管理 | ✅ 完成 | 建立、查詢、模擬付款（僅測試環境） |
+| 訂單管理 | ✅ 完成 | 建立、查詢（狀態篩選與分頁）、模擬付款（僅測試環境） |
 | 綠界金流串接 | ✅ 完成 | ECPay AIO 付款、QueryTradeInfo 查詢驗證 |
 | 後台商品管理 | ✅ 完成 | 商品 CRUD |
 | 後台訂單管理 | ✅ 完成 | 訂單查詢與狀態篩選 |
 | 前台頁面 | ✅ 完成 | EJS + Tailwind CSS |
 | 後台頁面 | ✅ 完成 | EJS + Tailwind CSS |
-| 測試 | ✅ 完成 | 72 項 Unit/API + 15 項 Integration + 1 項綠界真實付款 E2E |
+| 測試 | ✅ 完成 | 72 項 Unit/API + 18 項 Integration + 1 項綠界真實付款 E2E |
 | API 文件 | ✅ 完成 | Swagger/OpenAPI 生成與 Postman Collection 自動轉換 |
 
 ---
@@ -310,11 +310,32 @@
 | 400 | CART_EMPTY | 購物車為空 |
 | 400 | STOCK_INSUFFICIENT | 庫存不足（訊息中列出所有不足商品名稱；交易內條件式扣減失敗亦回此錯誤） |
 
-### GET /api/orders — 訂單列表
+### GET /api/orders — 訂單列表（篩選與分頁）
 
-**行為描述**：回傳當前使用者的所有訂單，依建立時間降序排列。無分頁。
+**行為描述**：回傳當前使用者的訂單，依建立時間由新到舊排列，支援狀態篩選與分頁。
 
-**回應欄位**：id, order_no, subtotal, discount, coupon_code, shipping_fee, shipping_method, is_remote_area, is_express, total_amount, status, created_at
+**Query 參數**：
+
+| 參數 | 型別 | 必填 | 說明 |
+|------|------|------|------|
+| status | string | 否 | `pending`、`paid`、`failed`；其他值回 400 |
+| page | integer | 否 | 頁碼，預設 1，必須為正整數 |
+| limit | integer | 否 | 每頁筆數，預設 10，必須為正整數，超過 50 以 50 計 |
+
+**回應欄位**：`data.orders`（id, order_no, subtotal, discount, coupon_code, shipping_fee, shipping_method, is_remote_area, is_express, total_amount, status, created_at）、`data.pagination`（page, limit, total, totalPages）
+
+**業務邏輯**：
+- 只查 `user_id` 為當前使用者的訂單
+- 排序：`created_at DESC`，同秒時以 `rowid DESC` 為次序
+- `totalPages = ceil(total / limit)`；`total` 為 0 時 `totalPages` 為 0
+- `page` 超過總頁數時回空陣列，不視為錯誤
+
+**錯誤情境**：
+
+| 狀態碼 | 錯誤碼 | 情境 |
+|--------|--------|------|
+| 400 | VALIDATION_ERROR | `status` 不在允許值內 |
+| 400 | VALIDATION_ERROR | `page` 或 `limit` 不是正整數 |
 
 ### GET /api/orders/:id — 訂單詳情
 

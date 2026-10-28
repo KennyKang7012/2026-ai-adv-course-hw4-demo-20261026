@@ -26,12 +26,32 @@ function findOrderForUser(orderId, userId) {
   return db.prepare('SELECT * FROM orders WHERE id = ? AND user_id = ?').get(orderId, userId);
 }
 
-function listOrdersForUser(userId) {
-  return db.prepare(
-    `SELECT id, order_no, subtotal, discount, coupon_code, shipping_fee, shipping_method,
-            is_remote_area, is_express, total_amount, status, created_at
-     FROM orders WHERE user_id = ? ORDER BY created_at DESC`
-  ).all(userId);
+const ORDER_LIST_COLUMNS = `id, order_no, subtotal, discount, coupon_code, shipping_fee, shipping_method,
+       is_remote_area, is_express, total_amount, status, created_at`;
+
+/**
+ * Page through one member's orders, newest first.
+ * `status` is optional; `limit`/`offset` are already validated by the route.
+ */
+function listOrdersForUser({ userId, status, limit, offset }) {
+  const filters = ['user_id = ?'];
+  const params = [userId];
+
+  if (status) {
+    filters.push('status = ?');
+    params.push(status);
+  }
+
+  const where = `WHERE ${filters.join(' AND ')}`;
+
+  const total = db.prepare(`SELECT COUNT(*) AS count FROM orders ${where}`).get(...params).count;
+  const orders = db.prepare(
+    `SELECT ${ORDER_LIST_COLUMNS} FROM orders ${where}
+     ORDER BY created_at DESC, rowid DESC
+     LIMIT ? OFFSET ?`
+  ).all(...params, limit, offset);
+
+  return { orders, total };
 }
 
 function getOrderItems(orderId) {
